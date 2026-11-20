@@ -1,0 +1,44 @@
+name: Engineering Quality Gates CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  quality-gates:
+    name: Enforce Standards & Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Gate 1 - Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Runtime Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies (Clean Install)
+        run: npm ci
+
+      - name: Gate 2 - Dependency Vulnerability Audit
+        run: npm audit --audit-level=high
+
+      - name: Gate 3 - Code Style & Static Type Check
+        run: |
+          npm run lint
+          npm run typecheck
+
+      - name: Gate 4 - Architecture Boundary Check
+        run: npm run arch:check
+
+      - name: Gate 5 - Automated Test Suite (Unit & Integration)
+        run: npm test -- --ci --coverage
